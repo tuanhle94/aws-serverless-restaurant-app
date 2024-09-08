@@ -1,8 +1,8 @@
-const { PolicyStatement, Effect } = require('aws-cdk-lib/aws-iam')
 const { Stack, Fn } = require('aws-cdk-lib')
 const { Runtime, Code, Function } = require('aws-cdk-lib/aws-lambda')
 const { RestApi, LambdaIntegration, AuthorizationType } = require('aws-cdk-lib/aws-apigateway')
 const { NodejsFunction } = require('aws-cdk-lib/aws-lambda-nodejs')
+const { PolicyStatement, Effect } = require('aws-cdk-lib/aws-iam')
 
 class ApiStack extends Stack {
   constructor(scope, id, props) {
@@ -46,16 +46,31 @@ class ApiStack extends Stack {
         restaurants_table: props.restaurantsTable.tableName
       }
     })
-    props.restaurantsTable.grantReadData(getRestaurantsFunction)    
+    props.restaurantsTable.grantReadData(getRestaurantsFunction)
+
+    const searchRestaurantsFunction = new Function(this, 'SearchRestaurants', {
+      runtime: Runtime.NODEJS_18_X,
+      handler: 'search-restaurants.handler',
+      code: Code.fromAsset('functions'),
+      environment: {
+        default_results: '8',
+        restaurants_table: props.restaurantsTable.tableName
+      }
+    })
+    props.restaurantsTable.grantReadData(searchRestaurantsFunction)    
 
     const getIndexLambdaIntegration = new LambdaIntegration(getIndexFunction)
     const getRestaurantsLambdaIntegration = new LambdaIntegration(getRestaurantsFunction)
+    const searchRestaurantsLambdaIntegration = new LambdaIntegration(searchRestaurantsFunction)
+
     api.root.addMethod('GET', getIndexLambdaIntegration)
-    api.root.addResource('restaurants')
-    .addMethod('GET', getRestaurantsLambdaIntegration, {
-      authorizationType: AuthorizationType.IAM
-    })
-  
+    const restaurantsResource = api.root.addResource('restaurants')
+    restaurantsResource.addMethod('GET', getRestaurantsLambdaIntegration, {
+        authorizationType: AuthorizationType.IAM
+      })
+    restaurantsResource.addResource('search')
+      .addMethod('POST', searchRestaurantsLambdaIntegration)
+
     const apiInvokePolicy = new PolicyStatement({
       effect: Effect.ALLOW,
       actions: ['execute-api:Invoke'],
