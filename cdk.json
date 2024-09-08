@@ -1,5 +1,5 @@
 {
-  "app": "node bin/nodejs-serverless-training-course.js",
+  "app": "node cdk/main.js",
   "watch": {
     "include": [
       "**"
